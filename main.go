@@ -1,12 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 )
 
 var M = 998244353
 var W = [24]int{1, 998244352, 911660635, 625715529, 373294451, 827987769, 280333251, 581015842, 628092333, 300892551, 586046298, 615001099, 318017948, 64341522, 106061068, 304605202, 631920086, 857779016, 841431251, 805775211, 390359979, 923521, 961, 31}
+
+func sign(x int) int {
+	if x < 0 {
+		return 1
+	}
+	return 0
+}
 
 func log2(n int) int {
 	return int(math.Log2(float64(n)))
@@ -54,7 +62,7 @@ func inv(a int) int {
 
 type wideInt struct {
 	val []int
-	f   bool
+	f   int
 }
 
 func (w *wideInt) size() int {
@@ -68,34 +76,38 @@ func (w *wideInt) resize(n int) {
 }
 
 func (w *wideInt) carry() {
-	for i := 0; i < w.size()-1; i++ {
+	size := w.size()
+	for i := 0; i < size-1; i++ {
 		w.val[i+1] += w.val[i] / 10
 		w.val[i] %= 10
 	}
-	for abs(w.val[w.size()-1]) > 9 {
-		w.val = append(w.val, w.val[w.size()-1]/10)
-		w.val[w.size()-2] %= 10
+	for abs(w.val[size-1]) > 9 {
+		w.val = append(w.val, w.val[size-1]/10)
+		size++
+		w.val[size-2] %= 10
 	}
-	for w.size() > 1 && w.val[w.size()-1] == 0 {
-		w.val = w.val[:w.size()-1]
+	for size > 1 && w.val[size-1] == 0 {
+		w.val = w.val[:size-1]
+		size--
 	}
-	w.resize(nextPowerOfTwo(w.size()))
+	w.resize(nextPowerOfTwo(size))
 }
 
 func (w *wideInt) print() {
-	if w.f {
+	if w.f == 1 {
 		fmt.Print("-")
 	}
+	var buf bytes.Buffer
 	var i = w.size() - 1
 	for ; i > 0 && w.val[i] == 0; i-- {
 	}
 	for ; i >= 0; i-- {
-		fmt.Print(w.val[i])
+		buf.WriteByte(byte(w.val[i]) + '0')
 	}
-	fmt.Print("\n")
+	fmt.Println(buf.String())
 }
 
-func newWideInt(val []int, f bool) wideInt {
+func newWideInt(val []int, f int) wideInt {
 	n := len(val)
 	pow := 1
 	for pow < n {
@@ -107,7 +119,7 @@ func newWideInt(val []int, f bool) wideInt {
 }
 
 func toWideInt(val int) wideInt {
-	var res = wideInt{[]int{abs(val)}, val < 0}
+	var res = wideInt{[]int{abs(val)}, sign(val)}
 	res.carry()
 	return res
 }
@@ -116,19 +128,17 @@ func fft(p []int, w int) []int {
 	if len(p) == 1 {
 		return p
 	}
-	var a, b []int
-	for i, val := range p {
-		if i%2 == 0 {
-			a = append(a, val)
-		} else {
-			b = append(b, val)
-		}
+	n := len(p)
+	k := n / 2
+	a := make([]int, k)
+	b := make([]int, k)
+	for i := 0; i < n; i += 2 {
+		a[i/2] = p[i]
+		b[i/2] = p[i+1]
 	}
 	a = fft(a, (w*w)%M)
 	b = fft(b, (w*w)%M)
-	var n = len(p)
-	var k = n / 2
-	var wt = 1
+	wt := 1
 	for i := 0; i < n; i++ {
 		p[i] = (a[i%k] + b[i%k]*wt) % M
 		wt = (wt * w) % M
@@ -155,38 +165,38 @@ func swap(a *wideInt, b *wideInt) {
 
 func less(a wideInt, b wideInt) bool {
 	if a.f != b.f {
-		return a.f
+		return a.f == 1
 	}
 	var sz = nextPowerOfTwo(max(a.size(), b.size()))
 	a.resize(sz)
 	b.resize(sz)
 	for i := sz - 1; i >= 0; i-- {
 		if a.val[i] < b.val[i] {
-			return !a.f
+			return a.f != 1
 		}
 		if a.val[i] > b.val[i] {
-			return a.f
+			return a.f == 1
 		}
 	}
-	return a.f
+	return a.f == 1
 }
 
 func greater(a wideInt, b wideInt) bool {
 	if a.f != b.f {
-		return !a.f
+		return a.f != 1
 	}
 	var sz = nextPowerOfTwo(max(a.size(), b.size()))
 	a.resize(sz)
 	b.resize(sz)
 	for i := sz - 1; i >= 0; i-- {
 		if a.val[i] > b.val[i] {
-			return !a.f
+			return a.f != 1
 		}
 		if a.val[i] < b.val[i] {
-			return a.f
+			return a.f == 1
 		}
 	}
-	return a.f
+	return a.f == 1
 }
 
 func equal(a wideInt, b wideInt) bool {
@@ -205,22 +215,13 @@ func equal(a wideInt, b wideInt) bool {
 }
 
 func add(a wideInt, b wideInt) wideInt {
-	var sz = nextPowerOfTwo(max(a.size(), b.size()) + 1)
+	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
 	b.resize(sz)
-	var res = toWideInt(0)
+	res := toWideInt(0)
 	res.resize(sz)
 	for i := 0; i < sz; i++ {
-		if a.f {
-			res.val[i] -= a.val[i]
-		} else {
-			res.val[i] += a.val[i]
-		}
-		if b.f {
-			res.val[i] -= b.val[i]
-		} else {
-			res.val[i] += b.val[i]
-		}
+		res.val[i] = (1-a.f*2)*a.val[i] + (1-b.f*2)*b.val[i]
 	}
 	res.carry()
 	sz = res.size()
@@ -233,7 +234,7 @@ func add(a wideInt, b wideInt) wideInt {
 	for i := 0; i < sz; i++ {
 		if res.val[i] < 0 {
 			res.val[i] = -res.val[i]
-			res.f = !res.f
+			res.f = (res.f + 1) % 2
 			break
 		}
 	}
@@ -241,22 +242,13 @@ func add(a wideInt, b wideInt) wideInt {
 }
 
 func subtract(a wideInt, b wideInt) wideInt {
-	var sz = nextPowerOfTwo(max(a.size(), b.size()) + 1)
+	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
 	b.resize(sz)
-	var res = toWideInt(0)
+	res := toWideInt(0)
 	res.resize(sz)
 	for i := 0; i < sz; i++ {
-		if a.f {
-			res.val[i] -= a.val[i]
-		} else {
-			res.val[i] += a.val[i]
-		}
-		if b.f {
-			res.val[i] += b.val[i]
-		} else {
-			res.val[i] -= b.val[i]
-		}
+		res.val[i] = (1-a.f*2)*a.val[i] - (1-b.f*2)*b.val[i]
 	}
 	res.carry()
 	sz = res.size()
@@ -269,7 +261,7 @@ func subtract(a wideInt, b wideInt) wideInt {
 	for i := 0; i < sz; i++ {
 		if res.val[i] < 0 {
 			res.val[i] = -res.val[i]
-			res.f = !res.f
+			res.f = (res.f + 1) % 2
 			break
 		}
 	}
@@ -284,7 +276,7 @@ func multiply(a wideInt, b wideInt) wideInt {
 	b.val = evaluate(b.val)
 	var res wideInt
 	res.resize(sz)
-	res.f = a.f != b.f
+	res.f = a.f ^ b.f
 	for i := 0; i < sz; i++ {
 		res.val[i] = (a.val[i] * b.val[i]) % M
 	}
@@ -298,9 +290,9 @@ func multiply(a wideInt, b wideInt) wideInt {
 func divide(a wideInt, b wideInt) wideInt {
 	var base = 2
 	var res = toWideInt(0)
-	var f = a.f != b.f
-	a.f = false
-	b.f = false
+	var f = a.f ^ b.f
+	a.f = 0
+	b.f = 0
 	for less(b, a) || equal(b, a) {
 		var _b = newWideInt(b.val, b.f)
 		var tmp = toWideInt(1)
@@ -332,18 +324,27 @@ func pow(a wideInt, n wideInt) wideInt {
 }
 
 func isPrime(n wideInt) bool {
-	var i = toWideInt(2)
+	if less(n, toWideInt(2)) {
+		return false
+	}
+	if equal(n, toWideInt(2)) {
+		return true
+	}
+	if equal(mod(n, toWideInt(2)), toWideInt(0)) {
+		return false
+	}
+	var i = toWideInt(3)
 	for less(multiply(i, i), n) || equal(multiply(i, i), n) {
 		if equal(mod(n, i), toWideInt(0)) {
 			return false
 		}
-		i = add(i, toWideInt(1))
+		i = add(i, toWideInt(2))
 	}
 	return true
 }
 
 func main() {
-	var i = pow(toWideInt(10), toWideInt(2))
+	var i = toWideInt(0)
 	for true {
 		if isPrime(i) {
 			i.print()
