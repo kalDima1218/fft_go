@@ -9,6 +9,12 @@ import (
 var M = 998244353
 var W = [24]int{1, 998244352, 911660635, 625715529, 373294451, 827987769, 280333251, 581015842, 628092333, 300892551, 586046298, 615001099, 318017948, 64341522, 106061068, 304605202, 631920086, 857779016, 841431251, 805775211, 390359979, 923521, 961, 31}
 
+func makeCopy(a []int) []int {
+	var res = make([]int, len(a))
+	copy(res, a)
+	return res
+}
+
 func sign(x int) int {
 	if x < 0 {
 		return 1
@@ -58,6 +64,41 @@ func inv(a int) int {
 		n /= 2
 	}
 	return res
+}
+
+func fft(p []int, w int) []int {
+	if len(p) == 1 {
+		return p
+	}
+	n := len(p)
+	k := n / 2
+	a := make([]int, k)
+	b := make([]int, k)
+	for i := 0; i < n; i += 2 {
+		a[i/2] = p[i]
+		b[i/2] = p[i+1]
+	}
+	a = fft(a, (w*w)%M)
+	b = fft(b, (w*w)%M)
+	wt := 1
+	for i := 0; i < n; i++ {
+		p[i] = (a[i%k] + b[i%k]*wt) % M
+		wt = (wt * w) % M
+	}
+	return p
+}
+
+func evaluate(p []int) []int {
+	return fft(p, W[log2(len(p))])
+}
+
+func interpolate(p []int) []int {
+	p = fft(p, inv(W[log2(len(p))]))
+	var invN = inv(len(p))
+	for i, val := range p {
+		p[i] = (val * invN) % M
+	}
+	return p
 }
 
 type wideInt struct {
@@ -122,41 +163,6 @@ func toWideInt(val int) wideInt {
 	var res = wideInt{[]int{abs(val)}, sign(val)}
 	res.carry()
 	return res
-}
-
-func fft(p []int, w int) []int {
-	if len(p) == 1 {
-		return p
-	}
-	n := len(p)
-	k := n / 2
-	a := make([]int, k)
-	b := make([]int, k)
-	for i := 0; i < n; i += 2 {
-		a[i/2] = p[i]
-		b[i/2] = p[i+1]
-	}
-	a = fft(a, (w*w)%M)
-	b = fft(b, (w*w)%M)
-	wt := 1
-	for i := 0; i < n; i++ {
-		p[i] = (a[i%k] + b[i%k]*wt) % M
-		wt = (wt * w) % M
-	}
-	return p
-}
-
-func evaluate(p []int) []int {
-	return fft(p, W[log2(len(p))])
-}
-
-func interpolate(p []int) []int {
-	p = fft(p, inv(W[log2(len(p))]))
-	var invN = inv(len(p))
-	for i, val := range p {
-		p[i] = (val * invN) % M
-	}
-	return p
 }
 
 func swap(a *wideInt, b *wideInt) {
@@ -272,22 +278,21 @@ func multiply(a wideInt, b wideInt) wideInt {
 	var sz = nextPowerOfTwo(a.size() + b.size() + 1)
 	a.resize(sz)
 	b.resize(sz)
-	a.val = evaluate(a.val)
-	b.val = evaluate(b.val)
+	a.val = evaluate(makeCopy(a.val))
+	b.val = evaluate(makeCopy(b.val))
 	var res wideInt
 	res.resize(sz)
 	res.f = a.f ^ b.f
 	for i := 0; i < sz; i++ {
 		res.val[i] = (a.val[i] * b.val[i]) % M
 	}
-	res.val = interpolate(res.val)
-	a.val = interpolate(a.val)
-	b.val = interpolate(b.val)
+	res.val = interpolate(makeCopy(res.val))
 	res.carry()
 	return res
 }
 
 func divide(a wideInt, b wideInt) wideInt {
+	a.val = makeCopy(a.val)
 	var base = 2
 	var res = toWideInt(0)
 	var f = a.f ^ b.f
@@ -344,7 +349,7 @@ func isPrime(n wideInt) bool {
 }
 
 func main() {
-	var i = toWideInt(0)
+	var i = toWideInt(1)
 	for true {
 		if isPrime(i) {
 			i.print()
