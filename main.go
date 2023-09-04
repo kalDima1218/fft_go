@@ -315,7 +315,9 @@ func Divide(a WideInt, b WideInt) WideInt {
 }
 
 func Mod(a WideInt, b WideInt) WideInt {
-	return Subtract(a, Multiply(b, Divide(a, b)))
+	f := a.f
+	a.f = 0
+	return WideInt{Subtract(a, Multiply(b, Divide(a, b))).val, f}
 }
 
 func Pow(a WideInt, n WideInt) WideInt {
