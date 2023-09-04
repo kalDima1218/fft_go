@@ -213,6 +213,14 @@ func Equal(a WideInt, b WideInt) bool {
 	return true
 }
 
+func LessOrEqual(a WideInt, b WideInt) bool {
+	return Equal(a, b) || Less(a, b)
+}
+
+func GreaterOrEqual(a WideInt, b WideInt) bool {
+	return Equal(a, b) || Greater(a, b)
+}
+
 func Add(a WideInt, b WideInt) WideInt {
 	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
@@ -292,10 +300,10 @@ func Divide(a WideInt, b WideInt) WideInt {
 	var f = a.f ^ b.f
 	a.f = 0
 	b.f = 0
-	for Less(b, a) || Equal(b, a) {
+	for LessOrEqual(b, a) {
 		var _b = newWideInt(b.val, b.f)
 		var tmp = ToWideInt(1)
-		for Less(Multiply(_b, ToWideInt(base)), a) || Equal(Multiply(_b, ToWideInt(base)), a) {
+		for LessOrEqual(Multiply(_b, ToWideInt(base)), a) {
 			_b = Multiply(_b, ToWideInt(base))
 			tmp = Multiply(tmp, ToWideInt(base))
 		}
