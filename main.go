@@ -98,22 +98,22 @@ func interpolate(p []complex128) []int {
 	return res
 }
 
-type wideInt struct {
+type WideInt struct {
 	val []int
 	f   int
 }
 
-func (w *wideInt) size() int {
+func (w *WideInt) size() int {
 	return len(w.val)
 }
 
-func (w *wideInt) resize(n int) {
+func (w *WideInt) resize(n int) {
 	for w.size() < n {
 		w.val = append(w.val, 0)
 	}
 }
 
-func (w *wideInt) carry() {
+func (w *WideInt) carry() {
 	size := w.size()
 	for i := 0; i < size-1; i++ {
 		w.val[i+1] += w.val[i] / 10
@@ -131,7 +131,7 @@ func (w *wideInt) carry() {
 	w.resize(nextPowerOfTwo(size))
 }
 
-func (w *wideInt) print() {
+func (w *WideInt) Print() {
 	if w.f == 1 {
 		fmt.Print("-")
 	}
@@ -145,7 +145,7 @@ func (w *wideInt) print() {
 	fmt.Println(buf.String())
 }
 
-func newWideInt(val []int, f int) wideInt {
+func newWideInt(val []int, f int) WideInt {
 	n := len(val)
 	pow := 1
 	for pow < n {
@@ -153,16 +153,16 @@ func newWideInt(val []int, f int) wideInt {
 	}
 	resizedVar := make([]int, pow)
 	copy(resizedVar, val)
-	return wideInt{resizedVar, f}
+	return WideInt{resizedVar, f}
 }
 
-func toWideInt(val int) wideInt {
-	var res = wideInt{[]int{abs(val)}, sign(val)}
+func ToWideInt(val int) WideInt {
+	var res = WideInt{[]int{abs(val)}, sign(val)}
 	res.carry()
 	return res
 }
 
-func less(a wideInt, b wideInt) bool {
+func Less(a WideInt, b WideInt) bool {
 	if a.f != b.f {
 		return a.f == 1
 	}
@@ -180,7 +180,7 @@ func less(a wideInt, b wideInt) bool {
 	return a.f == 1
 }
 
-func greater(a wideInt, b wideInt) bool {
+func Greater(a WideInt, b WideInt) bool {
 	if a.f != b.f {
 		return a.f != 1
 	}
@@ -198,7 +198,7 @@ func greater(a wideInt, b wideInt) bool {
 	return a.f == 1
 }
 
-func equal(a wideInt, b wideInt) bool {
+func Equal(a WideInt, b WideInt) bool {
 	if a.f != b.f {
 		return false
 	}
@@ -213,11 +213,11 @@ func equal(a wideInt, b wideInt) bool {
 	return true
 }
 
-func add(a wideInt, b wideInt) wideInt {
+func Add(a WideInt, b WideInt) WideInt {
 	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
 	b.resize(sz)
-	res := toWideInt(0)
+	res := ToWideInt(0)
 	res.resize(sz)
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] + (1-b.f*2)*b.val[i]
@@ -240,11 +240,11 @@ func add(a wideInt, b wideInt) wideInt {
 	return res
 }
 
-func subtract(a wideInt, b wideInt) wideInt {
+func Subtract(a WideInt, b WideInt) WideInt {
 	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
 	b.resize(sz)
-	res := toWideInt(0)
+	res := ToWideInt(0)
 	res.resize(sz)
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] - (1-b.f*2)*b.val[i]
@@ -267,14 +267,14 @@ func subtract(a wideInt, b wideInt) wideInt {
 	return res
 }
 
-func multiply(a wideInt, b wideInt) wideInt {
+func Multiply(a WideInt, b WideInt) WideInt {
 	var sz = nextPowerOfTwo(a.size() + b.size() + 1)
 	a.resize(sz)
 	b.resize(sz)
 	aDots := evaluate(a.val)
 	bDots := evaluate(b.val)
 	resDots := make([]complex128, sz)
-	var res wideInt
+	var res WideInt
 	res.resize(sz)
 	res.f = a.f ^ b.f
 	for i := 0; i < sz; i++ {
@@ -285,59 +285,39 @@ func multiply(a wideInt, b wideInt) wideInt {
 	return res
 }
 
-func divide(a wideInt, b wideInt) wideInt {
+func Divide(a WideInt, b WideInt) WideInt {
 	a.val = makeCopy(a.val)
 	var base = 2
-	var res = toWideInt(0)
+	var res = ToWideInt(0)
 	var f = a.f ^ b.f
 	a.f = 0
 	b.f = 0
-	for less(b, a) || equal(b, a) {
+	for Less(b, a) || Equal(b, a) {
 		var _b = newWideInt(b.val, b.f)
-		var tmp = toWideInt(1)
-		for less(multiply(_b, toWideInt(base)), a) || equal(multiply(_b, toWideInt(base)), a) {
-			_b = multiply(_b, toWideInt(base))
-			tmp = multiply(tmp, toWideInt(base))
+		var tmp = ToWideInt(1)
+		for Less(Multiply(_b, ToWideInt(base)), a) || Equal(Multiply(_b, ToWideInt(base)), a) {
+			_b = Multiply(_b, ToWideInt(base))
+			tmp = Multiply(tmp, ToWideInt(base))
 		}
-		a = subtract(a, _b)
-		res = add(res, tmp)
+		a = Subtract(a, _b)
+		res = Add(res, tmp)
 	}
 	res.f = f
 	return res
 }
 
-func mod(a wideInt, b wideInt) wideInt {
-	return subtract(a, multiply(b, divide(a, b)))
+func Mod(a WideInt, b WideInt) WideInt {
+	return Subtract(a, Multiply(b, Divide(a, b)))
 }
 
-func pow(a wideInt, n wideInt) wideInt {
-	var res = toWideInt(1)
-	for greater(n, toWideInt(0)) {
-		if equal(mod(n, toWideInt(2)), toWideInt(1)) {
-			res = multiply(res, a)
+func Pow(a WideInt, n WideInt) WideInt {
+	var res = ToWideInt(1)
+	for Greater(n, ToWideInt(0)) {
+		if Equal(Mod(n, ToWideInt(2)), ToWideInt(1)) {
+			res = Multiply(res, a)
 		}
-		a = multiply(a, a)
-		n = divide(n, toWideInt(2))
+		a = Multiply(a, a)
+		n = Divide(n, ToWideInt(2))
 	}
 	return res
-}
-
-func isPrime(n wideInt) bool {
-	if less(n, toWideInt(2)) {
-		return false
-	}
-	if equal(n, toWideInt(2)) {
-		return true
-	}
-	if equal(mod(n, toWideInt(2)), toWideInt(0)) {
-		return false
-	}
-	var i = toWideInt(3)
-	for less(multiply(i, i), n) || equal(multiply(i, i), n) {
-		if equal(mod(n, i), toWideInt(0)) {
-			return false
-		}
-		i = add(i, toWideInt(2))
-	}
-	return true
 }
