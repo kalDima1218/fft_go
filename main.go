@@ -341,13 +341,3 @@ func isPrime(n wideInt) bool {
 	}
 	return true
 }
-
-func main() {
-	var i = toWideInt(1)
-	for true {
-		if isPrime(i) {
-			i.print()
-		}
-		i = add(i, toWideInt(1))
-	}
-}
