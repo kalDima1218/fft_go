@@ -6,13 +6,30 @@ import (
 	"math"
 )
 
-var M = 998244353
-var W = [24]int{1, 998244352, 911660635, 625715529, 373294451, 827987769, 280333251, 581015842, 628092333, 300892551, 586046298, 615001099, 318017948, 64341522, 106061068, 304605202, 631920086, 857779016, 841431251, 805775211, 390359979, 923521, 961, 31}
-
 func makeCopy(a []int) []int {
 	var res = make([]int, len(a))
 	copy(res, a)
 	return res
+}
+
+func toComplex(a []int) []complex128 {
+	var res = make([]complex128, len(a))
+	for i := 0; i < len(a); i++ {
+		res[i] = complex(float64(a[i]), 0)
+	}
+	return res
+}
+
+func toInt(a []complex128) []int {
+	var res = make([]int, len(a))
+	for i := 0; i < len(a); i++ {
+		res[i] = int(math.Ceil(real(a[i])))
+	}
+	return res
+}
+
+func nRootOfOne(n int) complex128 {
+	return complex(math.Cos(2*math.Pi/float64(n)), math.Sin(2*math.Pi/float64(n)))
 }
 
 func sign(x int) int {
@@ -20,10 +37,6 @@ func sign(x int) int {
 		return 1
 	}
 	return 0
-}
-
-func log2(n int) int {
-	return int(math.Log2(float64(n)))
 }
 
 func max(a int, b int) int {
@@ -51,54 +64,38 @@ func nextPowerOfTwo(n int) int {
 	return n
 }
 
-func inv(a int) int {
-	var n = M - 2
-	var res = 1
-	for n > 0 {
-		if n&1 == 1 {
-			res *= a
-			res %= M
-		}
-		a *= a
-		a %= M
-		n /= 2
-	}
-	return res
-}
-
-func fft(p []int, w int) []int {
+func fft(p []complex128, w complex128) []complex128 {
 	if len(p) == 1 {
 		return p
 	}
 	n := len(p)
 	k := n / 2
-	a := make([]int, k)
-	b := make([]int, k)
+	a := make([]complex128, k)
+	b := make([]complex128, k)
 	for i := 0; i < n; i += 2 {
 		a[i/2] = p[i]
 		b[i/2] = p[i+1]
 	}
-	a = fft(a, (w*w)%M)
-	b = fft(b, (w*w)%M)
-	wt := 1
+	a = fft(a, w*w)
+	b = fft(b, w*w)
+	var wt = complex(1, 0)
 	for i := 0; i < n; i++ {
-		p[i] = (a[i%k] + b[i%k]*wt) % M
-		wt = (wt * w) % M
+		p[i] = a[i%k] + b[i%k]*wt
+		wt *= w
 	}
 	return p
 }
 
-func evaluate(p []int) []int {
-	return fft(p, W[log2(len(p))])
+func evaluate(p []int) []complex128 {
+	return fft(toComplex(p), nRootOfOne(len(p)))
 }
 
-func interpolate(p []int) []int {
-	p = fft(p, inv(W[log2(len(p))]))
-	var invN = inv(len(p))
-	for i, val := range p {
-		p[i] = (val * invN) % M
+func interpolate(p []complex128) []int {
+	res := toInt(fft(p, nRootOfOne(-len(p))))
+	for i, val := range res {
+		res[i] = val / len(p)
 	}
-	return p
+	return res
 }
 
 type wideInt struct {
@@ -163,10 +160,6 @@ func toWideInt(val int) wideInt {
 	var res = wideInt{[]int{abs(val)}, sign(val)}
 	res.carry()
 	return res
-}
-
-func swap(a *wideInt, b *wideInt) {
-	*a, *b = *b, *a
 }
 
 func less(a wideInt, b wideInt) bool {
@@ -278,15 +271,16 @@ func multiply(a wideInt, b wideInt) wideInt {
 	var sz = nextPowerOfTwo(a.size() + b.size() + 1)
 	a.resize(sz)
 	b.resize(sz)
-	a.val = evaluate(makeCopy(a.val))
-	b.val = evaluate(makeCopy(b.val))
+	aDots := evaluate(a.val)
+	bDots := evaluate(b.val)
+	resDots := make([]complex128, sz)
 	var res wideInt
 	res.resize(sz)
 	res.f = a.f ^ b.f
 	for i := 0; i < sz; i++ {
-		res.val[i] = (a.val[i] * b.val[i]) % M
+		resDots[i] = aDots[i] * bDots[i]
 	}
-	res.val = interpolate(makeCopy(res.val))
+	res.val = interpolate(resDots)
 	res.carry()
 	return res
 }
