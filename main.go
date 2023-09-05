@@ -6,31 +6,7 @@ import (
 	"math"
 )
 
-func makeCopy(a []int) []int {
-	var res = make([]int, len(a))
-	copy(res, a)
-	return res
-}
 
-func toComplex(a []int) []complex128 {
-	var res = make([]complex128, len(a))
-	for i := 0; i < len(a); i++ {
-		res[i] = complex(float64(a[i]), 0)
-	}
-	return res
-}
-
-func toInt(a []complex128) []int {
-	var res = make([]int, len(a))
-	for i := 0; i < len(a); i++ {
-		res[i] = int(math.Ceil(real(a[i])))
-	}
-	return res
-}
-
-func nRootOfOne(n int) complex128 {
-	return complex(math.Cos(2*math.Pi/float64(n)), math.Sin(2*math.Pi/float64(n)))
-}
 
 func sign(x int) int {
 	if x < 0 {
@@ -53,8 +29,32 @@ func abs(a int) int {
 	return a
 }
 
-func swap(a *WideInt, b *WideInt) {
-	a, b = b, a
+func makeCopy(a []int) []int {
+	var res = make([]int, len(a))
+	copy(res, a)
+	return res
+}
+
+func toComplex(a []int) []complex128 {
+	var res = make([]complex128, len(a))
+	for i := 0; i < len(a); i++ {
+		res[i] = complex(float64(a[i]), 0)
+	}
+	return res
+}
+
+func toInt(a []complex128) []int {
+	var res = make([]int, len(a))
+	for i := 0; i < len(a); i++ {
+		res[i] = int(math.Ceil(real(a[i])))
+	}
+	return res
+}
+
+
+
+func nRootOfOne(n int) complex128 {
+	return complex(math.Cos(2*math.Pi/float64(n)), math.Sin(2*math.Pi/float64(n)))
 }
 
 func nextPowerOfTwo(n int) int {
@@ -67,6 +67,8 @@ func nextPowerOfTwo(n int) int {
 	n++
 	return n
 }
+
+
 
 func fft(p []complex128, w complex128) []complex128 {
 	if len(p) == 1 {
@@ -101,6 +103,8 @@ func interpolate(p []complex128) []int {
 	}
 	return res
 }
+
+
 
 type WideInt struct {
 	val []int
@@ -149,6 +153,8 @@ func (w *WideInt) Print() {
 	fmt.Print(buf.String())
 }
 
+
+
 func newWideInt(val []int, f int) WideInt {
 	n := len(val)
 	pow := 1
@@ -160,11 +166,23 @@ func newWideInt(val []int, f int) WideInt {
 	return WideInt{resizedVar, f}
 }
 
+
+
 func ToWideInt(val int) WideInt {
 	var res = WideInt{[]int{abs(val)}, sign(val)}
 	res.carry()
 	return res
 }
+
+func ToInt(w WideInt) int {
+	res := 0
+	for i := w.size() - 1; i >= 0; i-- {
+		res = res*10 + w.val[i]
+	}
+	return res
+}
+
+
 
 func Less(a WideInt, b WideInt) bool {
 	if a.f != b.f {
@@ -225,6 +243,8 @@ func GreaterOrEqual(a WideInt, b WideInt) bool {
 	return Equal(a, b) || Greater(a, b)
 }
 
+
+
 func Add(a WideInt, b WideInt) WideInt {
 	res := ToWideInt(0)
 	if a.f == 1 && b.f == 1 {
@@ -246,9 +266,9 @@ func Add(a WideInt, b WideInt) WideInt {
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] + (1-b.f*2)*b.val[i]
 	}
-	for i := 0; i < sz - 1; i++ {
+	for i := 0; i < sz-1; i++ {
 		if res.val[i] < 0 {
-			res.val[i]+=10
+			res.val[i] += 10
 			res.val[i+1]--
 		}
 	}
@@ -279,9 +299,9 @@ func Subtract(a WideInt, b WideInt) WideInt {
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] - (1-b.f*2)*b.val[i]
 	}
-	for i := 0; i < sz - 1; i++ {
+	for i := 0; i < sz-1; i++ {
 		if res.val[i] < 0 {
-			res.val[i]+=10
+			res.val[i] += 10
 			res.val[i+1]--
 		}
 	}
