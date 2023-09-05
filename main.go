@@ -246,6 +246,12 @@ func Add(a WideInt, b WideInt) WideInt {
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] + (1-b.f*2)*b.val[i]
 	}
+	for i := 0; i < sz - 1; i++ {
+		if res.val[i] < 0 {
+			res.val[i]+=10
+			res.val[i+1]--
+		}
+	}
 	res.carry()
 	return res
 }
@@ -272,6 +278,12 @@ func Subtract(a WideInt, b WideInt) WideInt {
 	res.resize(sz)
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] - (1-b.f*2)*b.val[i]
+	}
+	for i := 0; i < sz - 1; i++ {
+		if res.val[i] < 0 {
+			res.val[i]+=10
+			res.val[i+1]--
+		}
 	}
 	res.carry()
 	return res
