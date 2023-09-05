@@ -53,6 +53,10 @@ func abs(a int) int {
 	return a
 }
 
+func swap(a *WideInt, b *WideInt) {
+	a, b = b, a
+}
+
 func nextPowerOfTwo(n int) int {
 	n--
 	n |= n >> 1
@@ -222,56 +226,50 @@ func GreaterOrEqual(a WideInt, b WideInt) bool {
 }
 
 func Add(a WideInt, b WideInt) WideInt {
+	res := ToWideInt(0)
+	if a.f == 1 && b.f == 1 {
+		a.f, b.f = 0, 0
+		res = Add(a, b)
+		res.f = 1
+		return res
+	} else if a.f == 1 && b.f == 0 {
+		a.f = 0
+		return Subtract(b, a)
+	} else if a.f == 0 && b.f == 1 {
+		b.f = 0
+		return Subtract(a, b)
+	}
 	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
 	b.resize(sz)
-	res := ToWideInt(0)
 	res.resize(sz)
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] + (1-b.f*2)*b.val[i]
 	}
 	res.carry()
-	sz = res.size()
-	for i := 0; i < sz-1; i++ {
-		if res.val[i] < 0 {
-			res.val[i] += 10
-			res.val[i+1]--
-		}
-	}
-	for i := 0; i < sz; i++ {
-		if res.val[i] < 0 {
-			res.val[i] = -res.val[i]
-			res.f = (res.f + 1) % 2
-			break
-		}
-	}
 	return res
 }
 
 func Subtract(a WideInt, b WideInt) WideInt {
+	res := ToWideInt(0)
+	if b.f == 1 {
+		b.f = 0
+		return Add(a, b)
+	}
+	if Less(a, b) {
+		a.f, b.f = b.f, a.f
+		res = Subtract(b, a)
+		res.f = 1
+		return res
+	}
 	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
 	b.resize(sz)
-	res := ToWideInt(0)
 	res.resize(sz)
 	for i := 0; i < sz; i++ {
 		res.val[i] = (1-a.f*2)*a.val[i] - (1-b.f*2)*b.val[i]
 	}
 	res.carry()
-	sz = res.size()
-	for i := 0; i < sz-1; i++ {
-		if res.val[i] < 0 {
-			res.val[i] += 10
-			res.val[i+1]--
-		}
-	}
-	for i := 0; i < sz; i++ {
-		if res.val[i] < 0 {
-			res.val[i] = -res.val[i]
-			res.f = (res.f + 1) % 2
-			break
-		}
-	}
 	return res
 }
 
