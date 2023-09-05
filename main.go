@@ -146,7 +146,7 @@ func (w *WideInt) Print() {
 	for ; i >= 0; i-- {
 		buf.WriteByte(byte(w.val[i]) + '0')
 	}
-	fmt.Println(buf.String())
+	fmt.Print(buf.String())
 }
 
 func newWideInt(val []int, f int) WideInt {
@@ -255,12 +255,16 @@ func Subtract(a WideInt, b WideInt) WideInt {
 	if b.f == 1 {
 		b.f = 0
 		return Add(a, b)
-	}
-	if Less(a, b) {
-		a.f, b.f = b.f, a.f
-		res = Subtract(b, a)
-		res.f = 1
-		return res
+	} else if a.f == 1 {
+		b.f = 1
+		return Add(a, b)
+	} else if a.f == 0 {
+		if Less(a, b) {
+			a.f, b.f = b.f, a.f
+			res = Subtract(b, a)
+			res.f = 1
+			return res
+		}
 	}
 	sz := nextPowerOfTwo(max(a.size(), b.size()) + 1)
 	a.resize(sz)
