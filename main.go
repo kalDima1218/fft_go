@@ -2,11 +2,12 @@ package fft
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 )
 
-
+func log2(n int) int {
+	return int(math.Log2(float64(n)))
+}
 
 func sign(x int) int {
 	if x < 0 {
@@ -51,7 +52,17 @@ func toInt(a []complex128) []int {
 	return res
 }
 
-
+func newFFTBuffer(n int) [][][]complex128 {
+	k := log2(n)
+	buff := make([][][]complex128, k+1)
+	for i := k; i >= 0; i-- {
+		buff[k-i] = make([][]complex128, n/(1<<i))
+		for j := 0; j < n/(1<<i); j++ {
+			buff[k-i][j] = make([]complex128, 1<<i)
+		}
+	}
+	return buff
+}
 
 func nRootOfOne(n int) complex128 {
 	return complex(math.Cos(2*math.Pi/float64(n)), math.Sin(2*math.Pi/float64(n)))
@@ -68,43 +79,56 @@ func nextPowerOfTwo(n int) int {
 	return n
 }
 
-
-
-func fft(p []complex128, w complex128) []complex128 {
-	if len(p) == 1 {
-		return p
+func waitChan(c *chan any, n int) {
+	for i := 0; i < n; i++ {
+		<-*c
 	}
-	n := len(p)
+}
+
+func fft(p *[][][]complex128, lvl int, v int, w complex128, c *chan any) {
+	if len((*p)[lvl][v]) == 1 {
+		*c <- nil
+		return
+	}
+	n := len((*p)[lvl][v])
 	k := n / 2
-	a := make([]complex128, k)
-	b := make([]complex128, k)
 	for i := 0; i < n; i += 2 {
-		a[i/2] = p[i]
-		b[i/2] = p[i+1]
+		(*p)[lvl+1][v*2][i/2] = (*p)[lvl][v][i]
+		(*p)[lvl+1][v*2+1][i/2] = (*p)[lvl][v][i+1]
 	}
-	a = fft(a, w*w)
-	b = fft(b, w*w)
+	ch := make(chan any)
+	go fft(p, lvl+1, v*2, w*w, &ch)
+	go fft(p, lvl+1, v*2+1, w*w, &ch)
+	waitChan(&ch, 2)
 	var wt = complex(1, 0)
 	for i := 0; i < n; i++ {
-		p[i] = a[i%k] + b[i%k]*wt
+		(*p)[lvl][v][i] = (*p)[lvl+1][v*2][i%k] + (*p)[lvl+1][v*2+1][i%k]*wt
 		wt *= w
 	}
-	return p
+	*c <- nil
 }
 
 func evaluate(p []int) []complex128 {
-	return fft(toComplex(p), nRootOfOne(len(p)))
+	buff := newFFTBuffer(len(p))
+	buff[0][0] = toComplex(p)
+	ch := make(chan any)
+	go fft(&buff, 0, 0, nRootOfOne(len(p)), &ch)
+	waitChan(&ch, 1)
+	return buff[0][0]
 }
 
 func interpolate(p []complex128) []int {
-	res := toInt(fft(p, nRootOfOne(-len(p))))
+	buff := newFFTBuffer(len(p))
+	buff[0][0] = p
+	ch := make(chan any)
+	go fft(&buff, 0, 0, nRootOfOne(-len(p)), &ch)
+	waitChan(&ch, 1)
+	res := toInt(buff[0][0])
 	for i, val := range res {
 		res[i] = val / len(p)
 	}
 	return res
 }
-
-
 
 type WideInt struct {
 	val []int
@@ -141,7 +165,7 @@ func (w *WideInt) carry() {
 
 func (w *WideInt) Print() {
 	if w.f == 1 {
-		fmt.Print("-")
+		print("-")
 	}
 	var buf bytes.Buffer
 	var i = w.size() - 1
@@ -150,10 +174,8 @@ func (w *WideInt) Print() {
 	for ; i >= 0; i-- {
 		buf.WriteByte(byte(w.val[i]) + '0')
 	}
-	fmt.Print(buf.String())
+	print(buf.String())
 }
-
-
 
 func newWideInt(val []int, f int) WideInt {
 	n := len(val)
@@ -165,8 +187,6 @@ func newWideInt(val []int, f int) WideInt {
 	copy(resizedVar, val)
 	return WideInt{resizedVar, f}
 }
-
-
 
 func ToWideInt(val int) WideInt {
 	var res = WideInt{[]int{abs(val)}, sign(val)}
@@ -181,8 +201,6 @@ func ToInt(w WideInt) int {
 	}
 	return res
 }
-
-
 
 func Less(a WideInt, b WideInt) bool {
 	if a.f != b.f {
@@ -242,8 +260,6 @@ func LessOrEqual(a WideInt, b WideInt) bool {
 func GreaterOrEqual(a WideInt, b WideInt) bool {
 	return Equal(a, b) || Greater(a, b)
 }
-
-
 
 func Add(a WideInt, b WideInt) WideInt {
 	res := ToWideInt(0)
