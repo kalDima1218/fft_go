@@ -381,7 +381,7 @@ func Mod(a WideInt, b WideInt) WideInt {
 func Pow(a WideInt, n WideInt) WideInt {
 	var res = ToWideInt(1)
 	for Greater(n, ToWideInt(0)) {
-		if n.val[0] == 1 {
+		if Equal(Mod(n, ToWideInt(2)), ToWideInt(1)) {
 			res = Multiply(res, a)
 		}
 		a = Multiply(a, a)
@@ -393,7 +393,7 @@ func Pow(a WideInt, n WideInt) WideInt {
 func PowMod(a WideInt, n WideInt, m WideInt) WideInt {
 	var res = ToWideInt(1)
 	for Greater(n, ToWideInt(0)) {
-		if n.val[0] == 1 {
+		if Equal(Mod(n, ToWideInt(2)), ToWideInt(1)) {
 			res = Multiply(res, a)
 			res = Mod(res, m)
 		}
