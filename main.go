@@ -2,12 +2,9 @@ package fft
 
 import (
 	"bytes"
+	"fmt"
 	"math"
 )
-
-func log2(n int) int {
-	return int(math.Log2(float64(n)))
-}
 
 func sign(x int) int {
 	if x < 0 {
@@ -52,18 +49,6 @@ func toInt(a []complex128) []int {
 	return res
 }
 
-func newFFTBuffer(n int) [][][]complex128 {
-	k := log2(n)
-	buff := make([][][]complex128, k+1)
-	for i := k; i >= 0; i-- {
-		buff[k-i] = make([][]complex128, n/(1<<i))
-		for j := 0; j < n/(1<<i); j++ {
-			buff[k-i][j] = make([]complex128, 1<<i)
-		}
-	}
-	return buff
-}
-
 func nRootOfOne(n int) complex128 {
 	return complex(math.Cos(2*math.Pi/float64(n)), math.Sin(2*math.Pi/float64(n)))
 }
@@ -79,51 +64,34 @@ func nextPowerOfTwo(n int) int {
 	return n
 }
 
-func waitChan(c *chan any, n int) {
-	for i := 0; i < n; i++ {
-		<-*c
+func fft(p []complex128, w complex128) []complex128 {
+	if len(p) == 1 {
+		return p
 	}
-}
-
-func fft(p *[][][]complex128, lvl int, v int, w complex128, c *chan any) {
-	if len((*p)[lvl][v]) == 1 {
-		*c <- nil
-		return
-	}
-	n := len((*p)[lvl][v])
+	n := len(p)
 	k := n / 2
+	a := make([]complex128, k)
+	b := make([]complex128, k)
 	for i := 0; i < n; i += 2 {
-		(*p)[lvl+1][v*2][i/2] = (*p)[lvl][v][i]
-		(*p)[lvl+1][v*2+1][i/2] = (*p)[lvl][v][i+1]
+		a[i/2] = p[i]
+		b[i/2] = p[i+1]
 	}
-	ch := make(chan any)
-	go fft(p, lvl+1, v*2, w*w, &ch)
-	go fft(p, lvl+1, v*2+1, w*w, &ch)
-	waitChan(&ch, 2)
+	a = fft(a, w*w)
+	b = fft(b, w*w)
 	var wt = complex(1, 0)
 	for i := 0; i < n; i++ {
-		(*p)[lvl][v][i] = (*p)[lvl+1][v*2][i%k] + (*p)[lvl+1][v*2+1][i%k]*wt
+		p[i] = a[i%k] + b[i%k]*wt
 		wt *= w
 	}
-	*c <- nil
+	return p
 }
 
 func evaluate(p []int) []complex128 {
-	buff := newFFTBuffer(len(p))
-	buff[0][0] = toComplex(p)
-	ch := make(chan any)
-	go fft(&buff, 0, 0, nRootOfOne(len(p)), &ch)
-	waitChan(&ch, 1)
-	return buff[0][0]
+	return fft(toComplex(p), nRootOfOne(len(p)))
 }
 
 func interpolate(p []complex128) []int {
-	buff := newFFTBuffer(len(p))
-	buff[0][0] = p
-	ch := make(chan any)
-	go fft(&buff, 0, 0, nRootOfOne(-len(p)), &ch)
-	waitChan(&ch, 1)
-	res := toInt(buff[0][0])
+	res := toInt(fft(p, nRootOfOne(-len(p))))
 	for i, val := range res {
 		res[i] = val / len(p)
 	}
@@ -165,7 +133,7 @@ func (w *WideInt) carry() {
 
 func (w *WideInt) Print() {
 	if w.f == 1 {
-		print("-")
+		fmt.Print("-")
 	}
 	var buf bytes.Buffer
 	var i = w.size() - 1
@@ -174,7 +142,7 @@ func (w *WideInt) Print() {
 	for ; i >= 0; i-- {
 		buf.WriteByte(byte(w.val[i]) + '0')
 	}
-	print(buf.String())
+	fmt.Print(buf.String())
 }
 
 func newWideInt(val []int, f int) WideInt {
@@ -185,6 +153,23 @@ func newWideInt(val []int, f int) WideInt {
 	}
 	resizedVar := make([]int, pow)
 	copy(resizedVar, val)
+	return WideInt{resizedVar, f}
+}
+
+func NewWideInt(val string) WideInt {
+	f := 0
+	if val[0] == '-' {
+		f = 1
+	}
+	n := len(val)
+	pow := 1
+	for pow < n-f {
+		pow <<= 1
+	}
+	resizedVar := make([]int, pow)
+	for i := f; i < len(val); i++ {
+		resizedVar[i-f] = int(val[len(val)-1-i+f] - '0')
+	}
 	return WideInt{resizedVar, f}
 }
 
@@ -343,22 +328,45 @@ func Multiply(a WideInt, b WideInt) WideInt {
 	return res
 }
 
+func DivideBy2(a WideInt) WideInt {
+	res := make([]int, a.size())
+	for i := 0; i < a.size(); i++ {
+		if a.val[i]%2 == 1 && i > 0 {
+			res[i-1] += 5
+		}
+		res[i] = a.val[i] / 2
+	}
+	return WideInt{res, a.f}
+}
+
+func MultiplyBy2(a WideInt) WideInt {
+	res := make([]int, a.size()+1)
+	for i := a.size() - 1; i >= 0; i-- {
+		res[i] = a.val[i] * 2
+		if res[i] >= 10 {
+			res[i+1] += res[i] / 10
+			res[i] %= 10
+		}
+	}
+	return WideInt{res, a.f}
+}
+
 func Divide(a WideInt, b WideInt) WideInt {
-	a.val = makeCopy(a.val)
-	var base = 2
 	var res = ToWideInt(0)
 	var f = a.f ^ b.f
 	a.f = 0
 	b.f = 0
-	for LessOrEqual(b, a) {
-		var _b = newWideInt(b.val, b.f)
-		var tmp = ToWideInt(1)
-		for LessOrEqual(Multiply(_b, ToWideInt(base)), a) {
-			_b = Multiply(_b, ToWideInt(base))
-			tmp = Multiply(tmp, ToWideInt(base))
+	c := ToWideInt(1)
+	for LessOrEqual(Multiply(c, b), a) {
+		c = MultiplyBy2(c)
+	}
+	_a := WideInt{makeCopy(a.val), a.f}
+	for Greater(c, ToWideInt(0)) {
+		if LessOrEqual(Multiply(c, b), _a) {
+			res = Add(res, c)
+			_a = Subtract(_a, Multiply(c, b))
 		}
-		a = Subtract(a, _b)
-		res = Add(res, tmp)
+		c = DivideBy2(c)
 	}
 	res.f = f
 	return res
@@ -373,11 +381,25 @@ func Mod(a WideInt, b WideInt) WideInt {
 func Pow(a WideInt, n WideInt) WideInt {
 	var res = ToWideInt(1)
 	for Greater(n, ToWideInt(0)) {
-		if Equal(Mod(n, ToWideInt(2)), ToWideInt(1)) {
+		if n.val[0] == 1 {
 			res = Multiply(res, a)
 		}
 		a = Multiply(a, a)
-		n = Divide(n, ToWideInt(2))
+		n = DivideBy2(n)
+	}
+	return res
+}
+
+func PowMod(a WideInt, n WideInt, m WideInt) WideInt {
+	var res = ToWideInt(1)
+	for Greater(n, ToWideInt(0)) {
+		if n.val[0] == 1 {
+			res = Multiply(res, a)
+			res = Mod(res, m)
+		}
+		a = Multiply(a, a)
+		a = Mod(a, m)
+		n = DivideBy2(n)
 	}
 	return res
 }
