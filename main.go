@@ -351,25 +351,25 @@ func MultiplyBy2(a WideInt) WideInt {
 	return WideInt{res, a.f}
 }
 
+// Divide TODO: https://ru.wikipedia.org/wiki/Деление_многочленов#Алгоритм_Зивекинга_—_Кона
 func Divide(a WideInt, b WideInt) WideInt {
-	var res = ToWideInt(0)
 	var f = a.f ^ b.f
 	a.f = 0
 	b.f = 0
-	c := ToWideInt(1)
-	for LessOrEqual(Multiply(c, b), a) {
-		c = MultiplyBy2(c)
-	}
-	_a := WideInt{makeCopy(a.val), a.f}
-	for Greater(c, ToWideInt(0)) {
-		if LessOrEqual(Multiply(c, b), _a) {
-			res = Add(res, c)
-			_a = Subtract(_a, Multiply(c, b))
+	l, r := ToWideInt(0), a
+	for Greater(Subtract(r, l), ToWideInt(1)) {
+		m := DivideBy2(Add(l, r))
+		if GreaterOrEqual(a, Multiply(m, b)) {
+			l = m
+		} else {
+			r = m
 		}
-		c = DivideBy2(c)
 	}
-	res.f = f
-	return res
+	if GreaterOrEqual(a, Multiply(r, b)) {
+		l = r
+	}
+	l.f = f
+	return l
 }
 
 func Mod(a WideInt, b WideInt) WideInt {
@@ -381,7 +381,7 @@ func Mod(a WideInt, b WideInt) WideInt {
 func Pow(a WideInt, n WideInt) WideInt {
 	var res = ToWideInt(1)
 	for Greater(n, ToWideInt(0)) {
-		if Equal(Mod(n, ToWideInt(2)), ToWideInt(1)) {
+		if n.val[0]%2 == 1 {
 			res = Multiply(res, a)
 		}
 		a = Multiply(a, a)
@@ -393,7 +393,7 @@ func Pow(a WideInt, n WideInt) WideInt {
 func PowMod(a WideInt, n WideInt, m WideInt) WideInt {
 	var res = ToWideInt(1)
 	for Greater(n, ToWideInt(0)) {
-		if Equal(Mod(n, ToWideInt(2)), ToWideInt(1)) {
+		if n.val[0]%2 == 1 {
 			res = Multiply(res, a)
 			res = Mod(res, m)
 		}
